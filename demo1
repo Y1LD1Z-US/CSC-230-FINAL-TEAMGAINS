@@ -4,51 +4,56 @@ import { motion } from "framer-motion";
 
 // ---- Theme (Light/Dark) ----
 // Tailwind config must include:  darkMode: 'class'
-const ThemeCtx = createContext<{ theme: "light" | "dark"; toggle: () => void; ready: boolean }>({ theme: "light", toggle: () => {}, ready: false });
+const ThemeCtx = React.createContext({ theme: 'light', toggle: () => {}, ready: false });
 
-function ThemeProvider({ children }: { children: React.ReactNode }) {
+function ThemeProvider({ children }) {
   const getInitial = () => {
-    if (typeof window === "undefined") return "light" as const;
-    const saved = localStorage.getItem("csc230-theme") as "light" | "dark" | null;
-    if (saved) return saved;
-    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    return prefersDark ? "dark" : "light";
+    if (typeof window === 'undefined') return 'light';
+    const saved = localStorage.getItem('csc230-theme');
+    if (saved === 'light' || saved === 'dark') return saved;
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'dark' : 'light';
   };
 
-  const [theme, setTheme] = useState<"light" | "dark">(getInitial);
-  const [ready, setReady] = useState(false);
+  const [theme, setTheme] = React.useState(getInitial);
+  const [ready, setReady] = React.useState(false);
 
-  // Use layout effect to apply the class BEFORE paint to minimize flicker
+  // Apply the class BEFORE paint to minimize flicker
   React.useLayoutEffect(() => {
     const root = document.documentElement;
-    if (theme === "dark") root.classList.add("dark");
-    else root.classList.remove("dark");
-    localStorage.setItem("csc230-theme", theme);
+    if (theme === 'dark') root.classList.add('dark');
+    else root.classList.remove('dark');
+    localStorage.setItem('csc230-theme', theme);
     setReady(true);
   }, [theme]);
 
-  // Optional: respond to system theme changes if user hasn't explicitly chosen
-  useEffect(() => {
-    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+  // Follow system theme if user hasn't chosen
+  React.useEffect(() => {
+    const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
     if (!mq) return;
-    const onChange = (e: MediaQueryListEvent) => {
-      const saved = localStorage.getItem("csc230-theme");
-      if (!saved) setTheme(e.matches ? "dark" : "light");
+    const onChange = (e) => {
+      const saved = localStorage.getItem('csc230-theme');
+      if (!saved) setTheme(e.matches ? 'dark' : 'light');
     };
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
+    mq.addEventListener ? mq.addEventListener('change', onChange) : mq.addListener(onChange);
+    return () => {
+      mq.removeEventListener ? mq.removeEventListener('change', onChange) : mq.removeListener(onChange);
+    };
   }, []);
 
-  const value = useMemo(() => ({ theme, toggle: () => setTheme((t) => (t === "light" ? "dark" : "light")), ready }), [theme, ready]);
+  const value = React.useMemo(
+    () => ({ theme, toggle: () => setTheme((t) => (t === 'light' ? 'dark' : 'light')), ready }),
+    [theme, ready]
+  );
+
   return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;
 }
 
 function useTheme() {
-  return useContext(ThemeCtx);
+  return React.useContext(ThemeCtx);
 }
 
-// Gate to avoid flash while applying initial theme
-function ThemeGate({ children }: { children: React.ReactNode }) {
+function ThemeGate({ children }) {
   const { ready } = useTheme();
   if (!ready) {
     return (
@@ -59,6 +64,7 @@ function ThemeGate({ children }: { children: React.ReactNode }) {
   }
   return <>{children}</>;
 }
+
 
 // ---- Shared UI bits ----
 function Logo() {
