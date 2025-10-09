@@ -1,0 +1,612 @@
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
+import { motion } from "framer-motion";
+
+// ---- Theme (Light/Dark) ----
+// Tailwind config must include:  darkMode: 'class'
+const ThemeCtx = createContext<{ theme: "light" | "dark"; toggle: () => void; ready: boolean }>({ theme: "light", toggle: () => {}, ready: false });
+
+function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const getInitial = () => {
+    if (typeof window === "undefined") return "light" as const;
+    const saved = localStorage.getItem("csc230-theme") as "light" | "dark" | null;
+    if (saved) return saved;
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    return prefersDark ? "dark" : "light";
+  };
+
+  const [theme, setTheme] = useState<"light" | "dark">(getInitial);
+  const [ready, setReady] = useState(false);
+
+  // Use layout effect to apply the class BEFORE paint to minimize flicker
+  React.useLayoutEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
+    localStorage.setItem("csc230-theme", theme);
+    setReady(true);
+  }, [theme]);
+
+  // Optional: respond to system theme changes if user hasn't explicitly chosen
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!mq) return;
+    const onChange = (e: MediaQueryListEvent) => {
+      const saved = localStorage.getItem("csc230-theme");
+      if (!saved) setTheme(e.matches ? "dark" : "light");
+    };
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+
+  const value = useMemo(() => ({ theme, toggle: () => setTheme((t) => (t === "light" ? "dark" : "light")), ready }), [theme, ready]);
+  return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;
+}
+
+function useTheme() {
+  return useContext(ThemeCtx);
+}
+
+// Gate to avoid flash while applying initial theme
+function ThemeGate({ children }: { children: React.ReactNode }) {
+  const { ready } = useTheme();
+  if (!ready) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition">
+        <div className="animate-pulse text-sm opacity-70">Loading…</div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
+// ---- Shared UI bits ----
+function Logo() {
+  return (
+    <div className="flex items-center gap-2 select-none">
+      <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-fuchsia-500 via-indigo-500 to-sky-400 shadow-lg" />
+      <div className="font-semibold tracking-tight bg-gradient-to-r from-fuchsia-600 via-indigo-600 to-sky-500 bg-clip-text text-transparent">
+        CSC 230
+      </div>
+    </div>
+  );
+}
+
+const linkBase =
+  "px-3 py-2 rounded-xl transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500";
+
+function ThemeToggle() {
+  const { theme, toggle } = useTheme();
+  return (
+    <button
+      onClick={toggle}
+      className="ml-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800 shadow-sm text-sm"
+      aria-label="Toggle color theme"
+      title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+    >
+      <span className="inline-flex items-center gap-2">
+        <span className="text-base" aria-hidden>
+          {theme === "light" ? "🌙" : "☀️"}
+        </span>
+        <span className="hidden sm:inline">{theme === "light" ? "Dark" : "Light"}</span>
+      </span>
+    </button>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-screen text-slate-900 dark:text-slate-100 bg-gradient-to-b from-white to-slate-50 dark:from-slate-950 dark:to-slate-900">
+      {/* colorful animated background blobs */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 0.5, scale: 1 }}
+          transition={{ duration: 1.2 }}
+          className="absolute -top-24 -left-24 h-80 w-80 rounded-full blur-3xl bg-fuchsia-400/40 dark:opacity-30"
+        />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 0.45, scale: 1 }}
+          transition={{ duration: 1.4, delay: 0.15 }}
+          className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full blur-3xl bg-sky-400/40 dark:opacity-30"
+        />
+        <motion.div
+          animate={{ y: [0, -12, 0] }}
+          transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+          className="absolute left-1/2 top-1/3 -translate-x-1/2 h-72 w-72 rounded-full blur-3xl bg-amber-300/40 dark:opacity-20"
+        />
+      </div>
+
+      <header className="sticky top-0 z-30 backdrop-blur supports-[backdrop-filter]:bg-white/70 bg-white/60 dark:supports-[backdrop-filter]:bg-slate-900/60 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+          <Logo />
+          <nav className="flex items-center gap-2 text-sm">
+            <NavLink
+              to="/"
+              className={({ isActive }) =>
+                `${linkBase} hover:bg-fuchsia-50 dark:hover:bg-fuchsia-900/30 ${isActive ? "bg-fuchsia-100/60 dark:bg-fuchsia-900/40" : ""}`
+              }
+            >
+              Home
+            </NavLink>
+            <NavLink
+              to="/about"
+              className={({ isActive }) =>
+                `${linkBase} hover:bg-indigo-50 dark:hover:bg-indigo-900/30 ${isActive ? "bg-indigo-100/60 dark:bg-indigo-900/40" : ""}`
+              }
+            >
+              About
+            </NavLink>
+            <NavLink
+              to="/login"
+              className={({ isActive }) =>
+                `${linkBase} hover:bg-sky-50 dark:hover:bg-sky-900/30 ${isActive ? "bg-sky-100/60 dark:bg-sky-900/40" : ""}`
+              }
+            >
+              Login
+            </NavLink>
+            <a href="#contact" className={`${linkBase} hidden md:inline hover:bg-amber-50 dark:hover:bg-amber-900/30`}>
+              Contact
+            </a>
+            <ThemeToggle />
+          </nav>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4">{children}</main>
+
+      <footer className="mt-24 border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-4 py-10 grid gap-6 sm:grid-cols-2 md:grid-cols-4 text-sm">
+          <div>
+            <Logo />
+            <p className="mt-3 text-slate-600 dark:text-slate-300">
+              Software Design · University project toolkit for regression, charts, and reproducible analysis.
+            </p>
+          </div>
+          <div>
+            <div className="font-semibold mb-2">Resources</div>
+            <ul className="space-y-1 text-slate-600 dark:text-slate-300">
+              <li>
+                <a className="hover:underline" href="#docs">
+                  Docs
+                </a>
+              </li>
+              <li>
+                <a className="hover:underline" href="#samples">
+                  Sample Datasets
+                </a>
+              </li>
+              <li>
+                <a className="hover:underline" href="#changelog">
+                  Changelog
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <div className="font-semibold mb-2">Course</div>
+            <ul className="space-y-1 text-slate-600 dark:text-slate-300">
+              <li>
+                <a className="hover:underline" href="#syllabus">
+                  Syllabus
+                </a>
+              </li>
+              <li>
+                <a className="hover:underline" href="#schedule">
+                  Schedule
+                </a>
+              </li>
+              <li>
+                <a className="hover:underline" href="#grading">
+                  Grading Policy
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div id="contact">
+            <div className="font-semibold mb-2">Contact</div>
+            <p className="text-slate-600 dark:text-slate-300">
+              Instructor: Prof. Jane Doe
+              <br />Email: jane.doe@example.edu
+            </p>
+          </div>
+        </div>
+        <div className="text-xs text-center text-slate-500 dark:text-slate-400 py-4">
+          © {new Date().getFullYear()} CSC 230 · All rights reserved.
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// Animation helpers
+const container = {
+  hidden: { opacity: 0, y: 20 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { staggerChildren: 0.06, duration: 0.5, ease: "easeOut" },
+  },
+};
+const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
+
+// ---- Home Page ----
+function PreviewCard() {
+  const [open, setOpen] = useState(false);
+
+  const content = (
+    <div className="p-6 w-full">
+      <div className="text-sm text-slate-500 dark:text-slate-400">Live preview</div>
+      <motion.div
+        animate={{ y: [0, -3, 0] }}
+        transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+        className="mt-2 h-40 md:h-56 rounded-2xl border border-slate-200 dark:border-slate-800 grid place-items-center bg-gradient-to-br from-indigo-50 via-fuchsia-50 to-amber-50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-900"
+      >
+        Your chart / regression output preview
+      </motion.div>
+      <div className="mt-3 flex flex-wrap gap-2 items-center">
+        {["r²: 0.87", "n = 142", "AIC: 120.4"].map((chip) => (
+          <div
+            key={chip}
+            className="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800 text-xs bg-white/80 dark:bg-slate-900/70 backdrop-blur"
+          >
+            {chip}
+          </div>
+        ))}
+        <button
+          onClick={() => setOpen(true)}
+          className="ml-auto px-3 py-1.5 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800 shadow-sm"
+        >
+          ⤢ Full screen
+        </button>
+        <a
+          href="/preview"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 rounded-xl text-sm border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800 shadow-sm"
+        >
+          🔗 New tab
+        </a>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div className="aspect-[16/10] rounded-3xl bg-white dark:bg-slate-900 shadow-2xl ring-1 ring-slate-200 dark:ring-slate-800 overflow-hidden">
+        <div className="h-full w-full grid place-items-center">{content}</div>
+      </div>
+
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm grid place-items-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Full screen preview"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+          }}
+        >
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button
+              onClick={() => setOpen(false)}
+              className="px-3 py-2 rounded-xl bg-white text-slate-900 hover:opacity-90 shadow"
+            >
+              Close (Esc)
+            </button>
+          </div>
+
+          <motion.div
+            initial={{ scale: 0.98 }}
+            animate={{ scale: 1 }}
+            className="w-full h-full max-w-6xl max-h-[88vh] rounded-3xl overflow-hidden ring-1 ring-white/20 bg-white dark:bg-slate-900 shadow-2xl"
+          >
+            <div className="h-full w-full p-4 grid gap-4 grid-rows-[auto,1fr]">
+              <div className="flex items-center justify-between text-sm text-slate-200">
+                <span className="font-medium">Live preview (fullscreen)</span>
+                <div className="hidden md:flex items-center gap-2">
+                  {["r²: 0.87", "n = 142", "AIC: 120.4"].map((chip) => (
+                    <div key={chip} className="px-3 py-1 rounded-lg border border-white/20 text-xs bg-white/10">
+                      {chip}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-indigo-50 via-fuchsia-50 to-amber-50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-900">
+                {/* Replace this area with your real chart/regression component */}
+                <div className="absolute inset-0 grid place-items-center text-slate-700 dark:text-slate-200 text-lg">
+                  Full‑screen chart goes here
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </>
+  );
+}
+
+function Home() {
+  return (
+    <Shell>
+      <section className="py-16">
+        <div className="grid gap-10 md:grid-cols-2 md:items-center">
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight">
+              <span className="bg-gradient-to-r from-fuchsia-600 via-indigo-600 to-sky-500 bg-clip-text text-transparent">
+                Build, analyze, and explain models
+              </span>{" "}
+              — all in one place.
+            </h1>
+            <p className="mt-4 text-lg text-slate-700 dark:text-slate-300">
+              A colorful toolkit for CSC 230: upload data, run regression, visualize, and export reproducible results with
+              citations.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <NavLink
+                to="/login"
+                className="px-5 py-2.5 rounded-2xl text-white shadow-lg bg-gradient-to-r from-fuchsia-600 via-indigo-600 to-sky-500 hover:opacity-90 active:scale-[0.98] transition"
+              >
+                Get started
+              </NavLink>
+              <a
+                href="#demo"
+                className="px-5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800 shadow-sm"
+              >
+                View demo
+              </a>
+            </div>
+            <motion.ul variants={container} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.2 }} className="mt-8 grid gap-3 text-sm text-slate-800 dark:text-slate-200">
+              {["Linked‑list friendly parsers for large text inputs","Brute force, Boyer–Moore, and KMP implementations (timed)","Regression + charts with exportable reports"].map((t) => (
+                <motion.li key={t} variants={item} className="flex items-start gap-2">
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-gradient-to-r from-fuchsia-500 to-sky-400" />
+                  {t}
+                </motion.li>
+              ))}
+            </motion.ul>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="relative"
+          >
+            <PreviewCard />
+          </motion.div>
+        </div>
+      </section>
+
+      <section className="pb-20" id="features">
+        <h2 className="text-2xl font-semibold">Features</h2>
+        <motion.div
+          variants={container}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.2 }}
+          className="mt-6 grid gap-6 sm:grid-cols-2 md:grid-cols-3"
+        >
+          {[
+            { title: "Linked Data Inputs", desc: "Upload CSV or paste text. Streams large inputs into custom linked‑list structures for algorithms.", hue: "from-fuchsia-500 to-rose-500" },
+            { title: "Pattern Matching Lab", desc: "Run Brute Force, Boyer–Moore, and KMP. Compare timings with consistent benchmarking.", hue: "from-indigo-500 to-blue-500" },
+            { title: "Regression Studio", desc: "Fit linear models, inspect residuals, export plots & a clean lab report as PDF.", hue: "from-amber-400 to-orange-500" },
+            { title: "Versioned Results", desc: "Each run is stored with parameters, seeds, and environment info for reproducibility.", hue: "from-emerald-500 to-teal-500" },
+            { title: "Explainability", desc: "Inline tips that translate math into plain English for write‑ups.", hue: "from-violet-500 to-fuchsia-500" },
+            { title: "Share", desc: "One‑click shareable links for graders/teammates with read‑only permissions.", hue: "from-sky-500 to-cyan-500" },
+          ].map((f) => (
+            <motion.div key={f.title} variants={item} whileHover={{ y: -4 }} className="group relative">
+              <div className={`absolute -inset-[1px] rounded-3xl bg-gradient-to-r ${f.hue} opacity-60 blur transition group-hover:opacity-90`} />
+              <div className="relative rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm hover:shadow-md transition">
+                <div className="text-base font-semibold">{f.title}</div>
+                <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300">{f.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </section>
+
+      <section className="pb-24" id="updates">
+        <h2 className="text-2xl font-semibold">Latest updates</h2>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {[1, 2, 3, 4].map((i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4 }}
+              className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/70 p-5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:shadow-md transition"
+            >
+              <div className="text-slate-900 dark:text-slate-100 font-medium">v0.{i}.x</div>
+              <ul className="list-disc ml-5 mt-1">
+                <li>Improved KMP failure function builder</li>
+                <li>Fixed CSV delimiter auto‑detect</li>
+                <li>Added export to .docx</li>
+              </ul>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+    </Shell>
+  );
+}
+
+// ---- Preview Standalone (new tab) ----
+function PreviewStandalone() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white to-slate-50 dark:from-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100">
+      <div className="mx-auto max-w-6xl p-4 md:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="font-semibold tracking-tight bg-gradient-to-r from-fuchsia-600 via-indigo-600 to-sky-500 bg-clip-text text-transparent text-xl">
+            Preview — New Tab
+          </div>
+          <a href="/" className="text-sm px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-800">← Back to app</a>
+        </div>
+        <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xl">
+          <div className="text-sm text-slate-500 dark:text-slate-400">Live preview</div>
+          <motion.div
+            animate={{ y: [0, -3, 0] }}
+            transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+            className="mt-2 h-[70vh] rounded-2xl border border-slate-200 dark:border-slate-800 grid place-items-center bg-gradient-to-br from-indigo-50 via-fuchsia-50 to-amber-50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-900"
+          >
+            Your chart / regression output preview (new tab)
+          </motion.div>
+          <div className="mt-3 flex gap-2">
+            {["r²: 0.87", "n = 142", "AIC: 120.4"].map((chip) => (
+              <div key={chip} className="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800 text-xs bg-white/80 dark:bg-slate-900/70 backdrop-blur">
+                {chip}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- About Page ----
+function About() {
+  return (
+    <Shell>
+      <section className="py-16">
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-fuchsia-600 via-indigo-600 to-sky-500 bg-clip-text text-transparent"
+        >
+          About the Project
+        </motion.h1>
+        <p className="mt-4 max-w-3xl text-lg text-slate-700 dark:text-slate-300">
+          This course app was built for <strong>CSC 230 · Software Design</strong> to give students a hands‑on way to run classic
+          algorithms and regression analysis on real data, then produce clean, graded‑ready reports.
+        </p>
+
+        <div className="mt-8 grid gap-6 md:grid-cols-3">
+          {[
+            { title: "Tech Stack", lines: ["React + Vite", "TypeScript", "Tailwind CSS", "Charting (Recharts / Chart.js)", "API: Node/Express"], hue: "from-indigo-500 to-sky-500" },
+            { title: "Course Outcomes", lines: ["Compare algorithmic performance (BF vs BM vs KMP)", "Explain time complexity observed vs theoretical", "Produce reproducible analysis"], hue: "from-amber-400 to-orange-500" },
+            { title: "Team", lines: ["Murat Yildiz — Lead Dev", "Teammate A — Algorithms", "Teammate B — Data Viz"], hue: "from-fuchsia-500 to-rose-500" },
+          ].map((b) => (
+            <motion.div key={b.title} whileHover={{ scale: 1.01 }} className="relative group">
+              <div className={`absolute -inset-[1px] rounded-3xl bg-gradient-to-r ${b.hue} opacity-60 blur transition group-hover:opacity-90`} />
+              <div className="relative rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+                <div className="font-semibold">{b.title}</div>
+                <ul className="mt-2 text-sm text-slate-700 dark:text-slate-300 space-y-1">
+                  {b.lines.map((l) => (
+                    <li key={l}>{l}</li>
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="mt-10 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/70 p-6 shadow-sm">
+          <div className="font-semibold">FAQ</div>
+          {[{
+            q: "Where is my data stored?",
+            a: "Locally in your browser during labs; projects saved to the course server when you click Save.",
+          },
+          { q: "How do I cite outputs?", a: "Exports include a methods box with algorithm settings, dataset hashes, and timestamps." },
+          { q: "Is this accessible?", a: "Yes—semantic HTML, keyboard navigation, high‑contrast modes, and ARIA labels are used." },].map(({ q, a }) => (
+            <details key={q} className="mt-3 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 bg-white/70 dark:bg-slate-900/60">
+              <summary className="cursor-pointer font-medium">{q}</summary>
+              <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">{a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+    </Shell>
+  );
+}
+
+// ---- Login Page ----
+function Login() {
+  return (
+    <Shell>
+      <section className="py-20 grid place-items-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/70 p-6 shadow-lg backdrop-blur"
+        >
+          <h1 className="text-3xl font-extrabold bg-gradient-to-r from-fuchsia-600 via-indigo-600 to-sky-500 bg-clip-text text-transparent">
+            Welcome back
+          </h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Sign in to access your labs, datasets, and saved reports.</p>
+
+          <form className="mt-6 grid gap-4" onSubmit={(e) => e.preventDefault()} aria-label="Login form">
+            <label className="grid gap-1">
+              <span className="text-sm">Email</span>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="you@utampa.edu"
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-sm">Password</span>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="••••••••"
+              />
+            </label>
+            <div className="flex items-center justify-between text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input type="checkbox" className="rounded" />
+                Remember me
+              </label>
+              <a href="#reset" className="hover:underline">
+                Forgot password?
+              </a>
+            </div>
+            <button className="mt-2 w-full rounded-2xl text-white px-4 py-2 shadow-lg bg-gradient-to-r from-fuchsia-600 via-indigo-600 to-sky-500 hover:opacity-90 active:scale-[0.99] transition">
+              Sign in
+            </button>
+            <div className="text-center text-sm text-slate-600 dark:text-slate-300">or</div>
+            <div className="grid gap-2">
+              <button className="w-full rounded-2xl border border-slate-300 dark:border-slate-700 px-4 py-2 bg-white/80 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800" aria-label="Sign in with Google">
+                Continue with Google
+              </button>
+              <button className="w-full rounded-2xl border border-slate-300 dark:border-slate-700 px-4 py-2 bg-white/80 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800" aria-label="Sign in with GitHub">
+                Continue with GitHub
+              </button>
+            </div>
+          </form>
+
+          <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">By continuing, you agree to the Course Terms and Honor Code.</p>
+        </motion.div>
+      </section>
+    </Shell>
+  );
+}
+
+// ---- App Router ----
+export default function App() {
+  return (
+    <ThemeProvider>
+      <ThemeGate>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/preview" element={<PreviewStandalone />} />
+            <Route path="*" element={<Home />} />
+          </Routes>
+        </BrowserRouter>
+      </ThemeGate>
+    </ThemeProvider>
+  );
+}
