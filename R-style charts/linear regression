@@ -1,0 +1,459 @@
+Etoile
+muratthegreat
+Idle
+
+Etoile
+
+ — 9/21/25, 8:06 PM
+yoo bro the design documents looks phenomenal  you're the goat!
+Yaro — 9/22/25, 10:06 AM
+Hi Murat, thank you so much.
+This is only the detailed Design Document
+There should also be a High-Level Design Document. I hope you remember from the previous class
+Could you please prepare it today before the first benchmark and send it to guys to the group. the deadline is tomorrow 8 AM
+Etoile
+
+ — 9/22/25, 2:42 PM
+Yes I remember, I will complete it today and send it out
+question, are we going to turn the benchmark 1 as a group or individually?
+Yaro — 9/23/25, 8:01 AM
+MURAT VERY COOL HIGH LEVEL DESIGN DOCUMENT
+THANK YOU
+Etoile
+
+ — 9/23/25, 8:07 AM
+https://docs.google.com/document/d/1_VeZ_AVTbm3qz0bPsIG916eLGcr1hxanNSlprOrXKs0/edit?usp=sharing
+Google Docs
+HIGH-LEVEL DESIGN
+GAINS APPLICATION SYSTEM ARCHITECTURE 1. Major Logical Components Presentation Tier (Frontend) Homepage (with FAQ and onboarding) Login Page (user authentication interface) Tool Dashboard (Linear Regression, Bar Chart, Line Chart selection) Data Input Forms (manual entry and file upload) Resu...
+Image
+check now
+https://docs.google.com/document/d/18voGkwrj1_nZV0A_UAixNHjjt8waVmMfFPpXCFQeK7I/edit?tab=t.0#heading=h.nx26hx83uigd
+Google Docs
+Summary of Initial Technical Work
+Summary of Initial Technical Work We began the GAINS application development by focusing on the frontend design and user experience. Using Next.js and React, we structured the core user interface components, including the homepage, login page, tool dashboard, data input forms, results display, an...
+Image
+what do you think about the summary
+Etoile
+
+ — 1:30 AM
+hey yarooo
+you still awake lol?
+Yaro — 1:31 AM
+Hi
+Yep
+Etoile
+
+ — 1:32 AM
+for the r code, are we only going to use csv files im still working on the graphs and models that we talked about on thursday
+i know you told me to do a research only, do you have actual script for models?
+Yaro — 1:33 AM
+great. yep, I think let's use csv for now. we can research xlx tomoroow
+Etoile
+
+ — 1:33 AM
+Image
+i have something like this
+def could do better
+might implement similar stuff to what we already have
+Yaro — 1:34 AM
+oh, let's see it tomorrow. on which branch are you working?
+Etoile
+
+ — 1:35 AM
+branch?
+Yaro — 1:35 AM
+I mean GitHub branch
+Etoile
+
+ — 1:35 AM
+like spesifically?
+main
+Yaro — 1:36 AM
+yep. have you pushed your code anywhere to GitHub or it's only on your machine for now?
+Etoile
+
+ — 1:36 AM
+it's on my machine i havent pushed it, i will commit it to the main branch under client/pages/tool/charts
+by tomorrow night most likel
+Yaro — 1:37 AM
+don't commit it to main since it is our main production branch. make sure to create a new one
+Yaro — 1:37 AM
+yep, great. Let's test what you have tomorrow
+good job, thank you
+Etoile
+
+ — 1:38 AM
+sounds good see you in the morning
+Etoile
+
+ — 1:39 AM
+absolutely man lets goooo
+let me send you the script you might wanna test it on your end as well
+before i push it
+import React, { useMemo, useState } from "react";
+import Papa from "papaparse";
+import {
+  LineChart,
+  Line,
+  BarChart,
+Expand
+SPOILER_muratRscript.txt
+14 KB
+﻿
+Yaro
+yapek_ih
+ 
+import React, { useMemo, useState } from "react";
+import Papa from "papaparse";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from "recharts";
+import { motion } from "framer-motion";
+
+type DataRow = Record<string, string | number | null | undefined>;
+type ChartType = "line" | "bar" | "pie" | "histogram" | "scatter";
+
+function isNumericArray(arr: any[]): arr is number[] {
+  return arr.every((v) => typeof v === "number" && Number.isFinite(v));
+}
+
+function toNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+function unique<T>(arr: T[]): T[] {
+  return Array.from(new Set(arr));
+}
+
+function fdBinCount(values: number[]): number {
+  if (values.length < 2) return Math.max(1, values.length);
+  const sorted = [...values].sort((a, b) => a - b);
+  const q1 = sorted[Math.floor(0.25 * (sorted.length - 1))];
+  const q3 = sorted[Math.floor(0.75 * (sorted.length - 1))];
+  const iqr = q3 - q1 || (sorted[sorted.length - 1] - sorted[0]) / 2 || 1;
+  const h = (2 * iqr) / Math.cbrt(values.length);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const bins = Math.max(1, Math.ceil((max - min) / (h || 1)));
+  return Math.min(60, Math.max(5, bins));
+}
+
+function linearRegression(xVals: number[], yVals: number[]) {
+  const n = xVals.length;
+  const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
+  const mx = mean(xVals);
+  const my = mean(yVals);
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xVals[i] - mx;
+    const dy = yVals[i] - my;
+    num += dx * dy;
+    den += dx * dx;
+  }
+  const b = den === 0 ? 0 : num / den;
+  const a = my - b * mx;
+  const ssTot = yVals.reduce((s, y) => s + Math.pow(y - my, 2), 0);
+  const ssRes = yVals.reduce((s, y, i) => s + Math.pow(y - (a + b * xVals[i]), 2), 0);
+  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
+  const s2 = ssRes / (n - 2);
+  const sx2 = den;
+  const se_b = Math.sqrt(s2 / sx2);
+  return { a, b, r2, se_b };
+}
+
+export default function RStyleCharts() {
+  const [raw, setRaw] = useState<DataRow[]>([]);
+  const [chartType, setChartType] = useState<ChartType>("scatter");
+  const [xKey, setXKey] = useState<string>("");
+  const [yKey, setYKey] = useState<string>("");
+  const [catKey, setCatKey] = useState<string>("");
+  const [valKey, setValKey] = useState<string>("");
+  const [binCount, setBinCount] = useState<number | undefined>(undefined);
+  const [showRegression, setShowRegression] = useState<boolean>(true);
+
+  const columns = useMemo(() => (raw[0] ? Object.keys(raw[0]) : []), [raw]);
+
+  const numericCols = useMemo(() => {
+    if (!raw.length) return [] as string[];
+    return columns.filter((key) =>
+      raw.some((row) => toNumber(row[key]) !== null)
+    );
+  }, [raw, columns]);
+
+  const { xVec, yVec } = useMemo(() => {
+    const xVals = raw.map((r) => toNumber(r[xKey])).filter((v): v is number => v !== null);
+    const yVals = raw.map((r) => toNumber(r[yKey])).filter((v): v is number => v !== null);
+    const len = Math.min(xVals.length, yVals.length);
+    return { xVec: xVals.slice(0, len), yVec: yVals.slice(0, len) };
+  }, [raw, xKey, yKey]);
+
+  const reg = useMemo(() => {
+    if (!xVec.length || !yVec.length) return null;
+    return linearRegression(xVec, yVec);
+  }, [xVec, yVec]);
+
+  const scatterData = useMemo(() => {
+    return raw
+      .map((r) => ({ x: toNumber(r[xKey]), y: toNumber(r[yKey]) }))
+      .filter((d) => d.x !== null && d.y !== null) as { x: number; y: number }[];
+  }, [raw, xKey, yKey]);
+
+  const lineBarData = useMemo(() => {
+    return raw
+      .map((r, idx) => ({
+        index: idx,
+        x: toNumber(r[xKey]) ?? r[xKey],
+        y: toNumber(r[yKey])
+      }))
+      .filter((d) => d.y !== null) as { index: number; x: any; y: number }[];
+  }, [raw, xKey, yKey]);
+
+  const pieData = useMemo(() => {
+    if (!catKey || !valKey) return [] as { name: string; value: number }[];
+    const map = new Map<string, number>();
+    for (const r of raw) {
+      const k = String(r[catKey] ?? "(missing)");
+      const v = toNumber(r[valKey]) ?? 0;
+      map.set(k, (map.get(k) ?? 0) + v);
+    }
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+  }, [raw, catKey, valKey]);
+
+  const histData = useMemo(() => {
+    if (!valKey) return [] as { bin: string; count: number }[];
+    const values = raw
+      .map((r) => toNumber(r[valKey]))
+      .filter((v): v is number => v !== null);
+    if (!values.length) return [];
+    const bins = binCount ?? fdBinCount(values);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const width = (max - min) / bins || 1;
+    const counts = Array.from({ length: bins }, () => 0);
+    for (const v of values) {
+      let idx = Math.floor((v - min) / width);
+      if (idx >= bins) idx = bins - 1;
+      counts[idx]++;
+    }
+    return counts.map((c, i) => ({
+      bin: `${(min + i * width).toFixed(2)}–${(min + (i + 1) * width).toFixed(2)}`,
+      count: c
+    }));
+  }, [raw, valKey, binCount]);
+
+  const regressionLine = useMemo(() => {
+    if (!reg || !scatterData.length) return [] as { x: number; y: number }[];
+    const xs = scatterData.map((d) => d.x);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const p1 = { x: minX, y: reg.a + reg.b * minX };
+    const p2 = { x: maxX, y: reg.a + reg.b * maxX };
+    return [p1, p2];
+  }, [reg, scatterData]);
+
+  function handleCSV(file: File) {
+    Papa.parse(file, {
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+      complete: (res) => {
+        const rows = (res.data as DataRow[]).filter((r) => Object.keys(r).length > 0);
+        setRaw(rows);
+        const keys = rows[0] ? Object.keys(rows[0]) : [];
+        setXKey(keys[0] ?? "");
+        setYKey(keys[1] ?? keys[0] ?? "");
+        setCatKey(keys[0] ?? "");
+        setValKey(keys[1] ?? "");
+      }
+    });
+  }
+
+  const colorRamp = useMemo(() => {
+    const base = [
+      "#4c78a8", "#f58518", "#e45756", "#72b7b2", "#54a24b",
+      "#eeca3b", "#b279a2", "#ff9da6", "#9d755d", "#bab0ac"
+    ];
+    return base;
+  }, []);
+
+  return (
+    <div className="min-h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <motion.h1
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="text-3xl font-bold tracking-tight"
+        >
+          GAINS – R‑Style Graphics & Linear Regression
+        </motion.h1>
+
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+          Upload a CSV and build Line, Bar, Pie, Histogram, or Scatter plots. Optional simple
+          linear regression overlays the best‑fit line with R².
+        </p>
+
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+            <label className="text-sm font-medium">Upload CSV</label>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleCSV(f);
+              }}
+              className="mt-2 block w-full text-sm"
+            />
+            {raw.length > 0 && (
+              <p className="mt-2 text-xs text-zinc-500">
+                Loaded <span className="font-semibold">{raw.length}</span> rows · {columns.length} columns
+              </p>
+            )}
+          </div>
+
+          <div className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+            <label className="text-sm font-medium">Chart Type</label>
+            <select
+              value={chartType}
+              onChange={(e) => setChartType(e.target.value as ChartType)}
+              className="mt-2 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
+            >
+              <option value="scatter">Scatter (for regression)</option>
+              <option value="line">Line</option>
+              <option value="bar">Bar</option>
+              <option value="pie">Pie</option>
+              <option value="histogram">Histogram</option>
+            </select>
+
+            {chartType === "scatter" && (
+              <div className="mt-3 space-y-2">
+                <div>
+                  <label className="text-xs">X (numeric)</label>
+                  <select
+                    value={xKey}
+                    onChange={(e) => setXKey(e.target.value)}
+                    className="mt-1 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
+                  >
+                    {columns.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs">Y (numeric)</label>
+                  <select
+                    value={yKey}
+                    onChange={(e) => setYKey(e.target.value)}
+                    className="mt-1 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
+                  >
+                    {columns.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <input id="reg" type="checkbox" checked={showRegression} onChange={(e) => setShowRegression(e.target.checked)} />
+                  <label htmlFor="reg" className="text-xs">Show linear regression</label>
+                </div>
+              </div>
+            )}
+
+            {(chartType === "line" || chartType === "bar") && (
+              <div className="mt-3 space-y-2">
+                <div>
+                  <label className="text-xs">X (categorical or numeric)</label>
+                  <select
+                    value={xKey}
+                    onChange={(e) => setXKey(e.target.value)}
+                    className="mt-1 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
+                  >
+                    {columns.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs">Y (numeric)</label>
+                  <select
+                    value={yKey}
+                    onChange={(e) => setYKey(e.target.value)}
+                    className="mt-1 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
+                  >
+                    {numericCols.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {chartType === "pie" && (
+              <div className="mt-3 space-y-2">
+                <div>
+                  <label className="text-xs">Category</label>
+                  <select
+                    value={catKey}
+                    onChange={(e) => setCatKey(e.target.value)}
+                    className="mt-1 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
+                  >
+                    {columns.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs">Value (numeric)</label>
+                  <select
+                    value={valKey}
+                    onChange={(e) => setValKey(e.target.value)}
+                    className="mt-1 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
+                  >
+                    {numericCols.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {chartType === "histogram" && (
+              <div className="mt-3 space-y-2">
+                <div>
+                  <label className="text-xs">Value (numeric)</label>
+                  <select
+                    value={valKey}
+                    onChange={(e) => setValKey(e.target.value)}
+                    className="mt-1 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
+                  >
+                    {numericCols.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs">Bins (optional)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={binCount ?? ""}
+                    onChange={(e) => setBinCount(e.target.value
