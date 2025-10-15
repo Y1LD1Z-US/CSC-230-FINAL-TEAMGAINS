@@ -1,5 +1,3 @@
-
- 
 import React, { useMemo, useState } from "react";
 import Papa from "papaparse";
 import {
@@ -21,24 +19,13 @@ import {
 } from "recharts";
 import { motion } from "framer-motion";
 
-type DataRow = Record<string, string | number | null | undefined>;
-type ChartType = "line" | "bar" | "pie" | "histogram" | "scatter";
-
-function isNumericArray(arr: any[]): arr is number[] {
-  return arr.every((v) => typeof v === "number" && Number.isFinite(v));
-}
-
-function toNumber(value: unknown): number | null {
+function toNumber(value) {
   if (value === null || value === undefined) return null;
   const n = typeof value === "number" ? value : Number(String(value).trim());
   return Number.isFinite(n) ? n : null;
 }
 
-function unique<T>(arr: T[]): T[] {
-  return Array.from(new Set(arr));
-}
-
-function fdBinCount(values: number[]): number {
+function fdBinCount(values) {
   if (values.length < 2) return Math.max(1, values.length);
   const sorted = [...values].sort((a, b) => a - b);
   const q1 = sorted[Math.floor(0.25 * (sorted.length - 1))];
@@ -51,9 +38,11 @@ function fdBinCount(values: number[]): number {
   return Math.min(60, Math.max(5, bins));
 }
 
-function linearRegression(xVals: number[], yVals: number[]) {
-  const n = xVals.length;
-  const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
+function linearRegression(xVals, yVals) {
+  const n = Math.min(xVals.length, yVals.length);
+  if (n < 2) return null;
+
+  const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
   const mx = mean(xVals);
   const my = mean(yVals);
   let num = 0;
@@ -66,37 +55,39 @@ function linearRegression(xVals: number[], yVals: number[]) {
   }
   const b = den === 0 ? 0 : num / den;
   const a = my - b * mx;
+
   const ssTot = yVals.reduce((s, y) => s + Math.pow(y - my, 2), 0);
   const ssRes = yVals.reduce((s, y, i) => s + Math.pow(y - (a + b * xVals[i]), 2), 0);
   const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
-  const s2 = ssRes / (n - 2);
-  const sx2 = den;
+
+  const s2 = n > 2 ? ssRes / (n - 2) : 0;
+  const sx2 = den || 1;
   const se_b = Math.sqrt(s2 / sx2);
+
   return { a, b, r2, se_b };
 }
 
 export default function RStyleCharts() {
-  const [raw, setRaw] = useState<DataRow[]>([]);
-  const [chartType, setChartType] = useState<ChartType>("scatter");
-  const [xKey, setXKey] = useState<string>("");
-  const [yKey, setYKey] = useState<string>("");
-  const [catKey, setCatKey] = useState<string>("");
-  const [valKey, setValKey] = useState<string>("");
-  const [binCount, setBinCount] = useState<number | undefined>(undefined);
-  const [showRegression, setShowRegression] = useState<boolean>(true);
+  const [raw, setRaw] = useState([]);
+  const [chartType, setChartType] = useState("scatter");
+  const [xKey, setXKey] = useState("");
+  const [yKey, setYKey] = useState("");
+  const [catKey, setCatKey] = useState("");
+  const [valKey, setValKey] = useState("");
+  const [binCount, setBinCount] = useState(undefined);
+  const [showRegression, setShowRegression] = useState(true);
 
   const columns = useMemo(() => (raw[0] ? Object.keys(raw[0]) : []), [raw]);
 
   const numericCols = useMemo(() => {
-    if (!raw.length) return [] as string[];
-    return columns.filter((key) =>
-      raw.some((row) => toNumber(row[key]) !== null)
-    );
+    if (!raw.length) return [];
+    return columns.filter((key) => raw.some((row) => toNumber(row[key]) !== null));
   }, [raw, columns]);
 
   const { xVec, yVec } = useMemo(() => {
-    const xVals = raw.map((r) => toNumber(r[xKey])).filter((v): v is number => v !== null);
-    const yVals = raw.map((r) => toNumber(r[yKey])).filter((v): v is number => v !== null);
+    if (!xKey || !yKey) return { xVec: [], yVec: [] };
+    const xVals = raw.map((r) => toNumber(r[xKey])).filter((v) => v !== null);
+    const yVals = raw.map((r) => toNumber(r[yKey])).filter((v) => v !== null);
     const len = Math.min(xVals.length, yVals.length);
     return { xVec: xVals.slice(0, len), yVec: yVals.slice(0, len) };
   }, [raw, xKey, yKey]);
@@ -107,24 +98,26 @@ export default function RStyleCharts() {
   }, [xVec, yVec]);
 
   const scatterData = useMemo(() => {
+    if (!xKey || !yKey) return [];
     return raw
       .map((r) => ({ x: toNumber(r[xKey]), y: toNumber(r[yKey]) }))
-      .filter((d) => d.x !== null && d.y !== null) as { x: number; y: number }[];
+      .filter((d) => d.x !== null && d.y !== null);
   }, [raw, xKey, yKey]);
 
   const lineBarData = useMemo(() => {
+    if (!xKey || !yKey) return [];
     return raw
       .map((r, idx) => ({
         index: idx,
         x: toNumber(r[xKey]) ?? r[xKey],
         y: toNumber(r[yKey])
       }))
-      .filter((d) => d.y !== null) as { index: number; x: any; y: number }[];
+      .filter((d) => d.y !== null);
   }, [raw, xKey, yKey]);
 
   const pieData = useMemo(() => {
-    if (!catKey || !valKey) return [] as { name: string; value: number }[];
-    const map = new Map<string, number>();
+    if (!catKey || !valKey) return [];
+    const map = new Map();
     for (const r of raw) {
       const k = String(r[catKey] ?? "(missing)");
       const v = toNumber(r[valKey]) ?? 0;
@@ -134,10 +127,8 @@ export default function RStyleCharts() {
   }, [raw, catKey, valKey]);
 
   const histData = useMemo(() => {
-    if (!valKey) return [] as { bin: string; count: number }[];
-    const values = raw
-      .map((r) => toNumber(r[valKey]))
-      .filter((v): v is number => v !== null);
+    if (!valKey) return [];
+    const values = raw.map((r) => toNumber(r[valKey])).filter((v) => v !== null);
     if (!values.length) return [];
     const bins = binCount ?? fdBinCount(values);
     const min = Math.min(...values);
@@ -156,22 +147,23 @@ export default function RStyleCharts() {
   }, [raw, valKey, binCount]);
 
   const regressionLine = useMemo(() => {
-    if (!reg || !scatterData.length) return [] as { x: number; y: number }[];
+    if (!reg || !scatterData.length) return [];
     const xs = scatterData.map((d) => d.x);
     const minX = Math.min(...xs);
     const maxX = Math.max(...xs);
-    const p1 = { x: minX, y: reg.a + reg.b * minX };
-    const p2 = { x: maxX, y: reg.a + reg.b * maxX };
-    return [p1, p2];
+    return [
+      { x: minX, y: reg.a + reg.b * minX },
+      { x: maxX, y: reg.a + reg.b * maxX }
+    ];
   }, [reg, scatterData]);
 
-  function handleCSV(file: File) {
+  function handleCSV(file) {
     Papa.parse(file, {
       header: true,
       dynamicTyping: true,
       skipEmptyLines: true,
       complete: (res) => {
-        const rows = (res.data as DataRow[]).filter((r) => Object.keys(r).length > 0);
+        const rows = res.data.filter((r) => Object.keys(r).length > 0);
         setRaw(rows);
         const keys = rows[0] ? Object.keys(rows[0]) : [];
         setXKey(keys[0] ?? "");
@@ -182,13 +174,13 @@ export default function RStyleCharts() {
     });
   }
 
-  const colorRamp = useMemo(() => {
-    const base = [
+  const colorRamp = useMemo(
+    () => [
       "#4c78a8", "#f58518", "#e45756", "#72b7b2", "#54a24b",
       "#eeca3b", "#b279a2", "#ff9da6", "#9d755d", "#bab0ac"
-    ];
-    return base;
-  }, []);
+    ],
+    []
+  );
 
   return (
     <div className="min-h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
@@ -199,12 +191,12 @@ export default function RStyleCharts() {
           transition={{ duration: 0.4 }}
           className="text-3xl font-bold tracking-tight"
         >
-          GAINS – R‑Style Graphics & Linear Regression
+          GAINS – R-Style Graphics & Linear Regression
         </motion.h1>
 
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
           Upload a CSV and build Line, Bar, Pie, Histogram, or Scatter plots. Optional simple
-          linear regression overlays the best‑fit line with R².
+          linear regression overlays the best-fit line with R².
         </p>
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -230,7 +222,7 @@ export default function RStyleCharts() {
             <label className="text-sm font-medium">Chart Type</label>
             <select
               value={chartType}
-              onChange={(e) => setChartType(e.target.value as ChartType)}
+              onChange={(e) => setChartType(e.target.value)}
               className="mt-2 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
             >
               <option value="scatter">Scatter (for regression)</option>
@@ -352,4 +344,117 @@ export default function RStyleCharts() {
                     min={1}
                     max={100}
                     value={binCount ?? ""}
-                    onChange={(e) => setBinCount(e.target.value
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setBinCount(v === "" ? undefined : Math.max(1, Math.min(100, Number(v))));
+                    }}
+                    className="mt-1 w-full rounded-xl bg-transparent border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm"
+                    placeholder="Auto"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+            <div className="text-sm font-medium">Status</div>
+            <ul className="mt-2 text-xs space-y-1 text-zinc-600 dark:text-zinc-300">
+              <li>Rows: <span className="font-semibold">{raw.length}</span></li>
+              <li>Columns: <span className="font-semibold">{columns.length}</span></li>
+              {reg && chartType === "scatter" && showRegression && (
+                <li>R²: <span className="font-semibold">{reg.r2.toFixed(4)}</span></li>
+              )}
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-6 h-[420px] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-3">
+          {chartType === "scatter" && scatterData.length > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="x" type="number" name={xKey || "x"} />
+                <YAxis dataKey="y" type="number" name={yKey || "y"} />
+                <Tooltip />
+                <Legend />
+                <Scatter name="Data" data={scatterData} />
+                {showRegression && reg && (
+                  <Line
+                    name={`Fit (R²=${reg.r2.toFixed(3)})`}
+                    type="linear"
+                    data={regressionLine}
+                    dataKey="y"
+                    dot={false}
+                    strokeDasharray="6 4"
+                  />
+                )}
+              </ScatterChart>
+            </ResponsiveContainer>
+          )}
+
+          {chartType === "line" && lineBarData.length > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={lineBarData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="x" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="y" name={yKey || "y"} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+
+          {chartType === "bar" && lineBarData.length > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={lineBarData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="x" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="y" name={yKey || "y"} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+
+          {chartType === "pie" && pieData.length > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip />
+                <Legend />
+                <Pie data={pieData} dataKey="value" nameKey="name" outerRadius="80%">
+                  {pieData.map((_, i) => (
+                    <Cell key={i} fill={colorRamp[i % colorRamp.length]} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+
+          {chartType === "histogram" && histData.length > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={histData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="bin" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" name="Count" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+
+          {(chartType === "scatter" && scatterData.length === 0) ||
+          ((chartType === "line" || chartType === "bar") && lineBarData.length === 0) ||
+          (chartType === "pie" && pieData.length === 0) ||
+          (chartType === "histogram" && histData.length === 0) ? (
+            <div className="w-full h-full flex items-center justify-center text-sm text-zinc-500">
+              Upload a CSV and select columns to visualize.
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
